@@ -12,6 +12,8 @@ import (
 	"fmt"
 )
 
+const errorPrefix = "gopromise: "
+
 // ProducerFunc is function that computes a value or an error.
 //
 // It runs asynchronously when passed to Call.
@@ -58,9 +60,9 @@ type promiseImpl[T any] struct {
 
 // Call starts producer in new goroutine and returns a Promise immediately.
 //
-// If producer is nil, returned promise resolves with error "nil producer".
+// If producer is nil, returned promise resolves with error "gopromise: nil producer".
 // If producer panics, panic is recovered and converted to
-// "producer panic: <panic value>" error.
+// "gopromise: producer panic: <panic value>" error.
 //
 // Example concurrent usage:
 //
@@ -74,7 +76,7 @@ type promiseImpl[T any] struct {
 func Call[T any](producer ProducerFunc[T]) Promise[T] {
 	if producer == nil {
 		promise := &promiseImpl[T]{done: make(chan struct{})}
-		promise.res.Err = fmt.Errorf("nil producer")
+		promise.res.Err = fmt.Errorf(errorPrefix + "nil producer")
 		close(promise.done)
 		return promise
 	}
@@ -87,21 +89,21 @@ func Call[T any](producer ProducerFunc[T]) Promise[T] {
 // CallContext starts producer in new goroutine and returns a Promise immediately.
 //
 // The producer receives ctx and can observe cancellation via ctx.Done().
-// If ctx is nil, returned promise resolves with error "nil context".
-// If producer is nil, returned promise resolves with error "nil producer".
+// If ctx is nil, returned promise resolves with error "gopromise: nil context".
+// If producer is nil, returned promise resolves with error "gopromise: nil producer".
 // If producer panics, panic is recovered and converted to
-// "producer panic: <panic value>" error.
+// "gopromise: producer panic: <panic value>" error.
 func CallContext[T any](ctx context.Context, producer ProducerContextFunc[T]) Promise[T] {
 	promise := &promiseImpl[T]{done: make(chan struct{})}
 
 	if ctx == nil {
-		promise.res.Err = fmt.Errorf("nil context")
+		promise.res.Err = fmt.Errorf(errorPrefix + "nil context")
 		close(promise.done)
 		return promise
 	}
 
 	if producer == nil {
-		promise.res.Err = fmt.Errorf("nil producer")
+		promise.res.Err = fmt.Errorf(errorPrefix + "nil producer")
 		close(promise.done)
 		return promise
 	}
@@ -110,7 +112,7 @@ func CallContext[T any](ctx context.Context, producer ProducerContextFunc[T]) Pr
 		defer close(promise.done)
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				promise.res.Err = fmt.Errorf("producer panic: %v", recovered)
+				promise.res.Err = fmt.Errorf(errorPrefix+"producer panic: %v", recovered)
 			}
 		}()
 
@@ -126,8 +128,8 @@ func CallContext[T any](ctx context.Context, producer ProducerContextFunc[T]) Pr
 // Resolve is safe to call many times and from multiple goroutines. Every call
 // returns same value/error tuple after producer completes.
 //
-// Resolve returns "empty promise" when receiver is nil and
-// "uninitialized promise" when internal done channel is nil.
+// Resolve returns "gopromise: empty promise" when receiver is nil and
+// "gopromise: uninitialized promise" when internal done channel is nil.
 func (promise *promiseImpl[T]) Resolve() (T, error) {
 	return promise.ResolveContext(context.Background())
 }
@@ -137,19 +139,19 @@ func (promise *promiseImpl[T]) Resolve() (T, error) {
 // If ctx is done before promise completes, ResolveContext returns ctx.Err().
 // Promise computation still continues and can be resolved later.
 //
-// ResolveContext returns "empty promise" when receiver is nil,
-// "uninitialized promise" when internal done channel is nil,
-// and "nil context" when ctx is nil.
+// ResolveContext returns "gopromise: empty promise" when receiver is nil,
+// "gopromise: uninitialized promise" when internal done channel is nil,
+// and "gopromise: nil context" when ctx is nil.
 func (promise *promiseImpl[T]) ResolveContext(ctx context.Context) (T, error) {
 	var nilT T
 	if promise == nil {
-		return nilT, fmt.Errorf("empty promise")
+		return nilT, fmt.Errorf(errorPrefix + "empty promise")
 	}
 	if promise.done == nil {
-		return nilT, fmt.Errorf("uninitialized promise")
+		return nilT, fmt.Errorf(errorPrefix + "uninitialized promise")
 	}
 	if ctx == nil {
-		return nilT, fmt.Errorf("nil context")
+		return nilT, fmt.Errorf(errorPrefix + "nil context")
 	}
 
 	select {

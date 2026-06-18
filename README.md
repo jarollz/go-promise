@@ -26,8 +26,8 @@ It also supports context-aware producer execution and context-aware waiting.
 - Safely mix `Resolve()` and `ResolveContext(ctx)` across goroutines on same promise.
 - `ResolveContext` caller timeouts do not affect other callers or final cached result.
 - Panic in producer is recovered and returned as error.
-- Nil producer returns deterministic error (`nil producer`).
-- Nil context returns deterministic error (`nil context`).
+- Nil producer returns deterministic error (`gopromise: nil producer`).
+- Nil context returns deterministic error (`gopromise: nil context`).
 
 ## Installation
 
@@ -134,12 +134,12 @@ _ = err2
 
 ## Error behavior
 
-- `Call(nil)` resolves with `nil producer`.
-- `CallContext(nil, producer)` resolves with `nil context`.
-- `ResolveContext(nil)` returns `nil context`.
-- panic inside producer resolves with `producer panic: <panic value>`.
-- internal nil receiver guard returns `empty promise`.
-- internal uninitialized guard returns `uninitialized promise`.
+- `Call(nil)` resolves with `gopromise: nil producer`.
+- `CallContext(nil, producer)` resolves with `gopromise: nil context`.
+- `ResolveContext(nil)` returns `gopromise: nil context`.
+- panic inside producer resolves with `gopromise: producer panic: <panic value>`.
+- internal nil receiver guard returns `gopromise: empty promise`.
+- internal uninitialized guard returns `gopromise: uninitialized promise`.
 
 ## API overview
 

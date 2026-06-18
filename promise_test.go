@@ -25,7 +25,7 @@ func TestCallAndCallContextInputValidation(t *testing.T) {
 				var producer ProducerFunc[int]
 				return Call(producer)
 			},
-			want: "nil producer",
+			want: "gopromise: nil producer",
 		},
 		{
 			name: "callcontext nil context",
@@ -34,7 +34,7 @@ func TestCallAndCallContextInputValidation(t *testing.T) {
 					return 1, nil
 				})
 			},
-			want: "nil context",
+			want: "gopromise: nil context",
 		},
 		{
 			name: "callcontext nil producer",
@@ -42,7 +42,7 @@ func TestCallAndCallContextInputValidation(t *testing.T) {
 				var producer ProducerContextFunc[int]
 				return CallContext(ctx, producer)
 			},
-			want: "nil producer",
+			want: "gopromise: nil producer",
 		},
 		{
 			name: "callcontext nil context and producer",
@@ -50,7 +50,7 @@ func TestCallAndCallContextInputValidation(t *testing.T) {
 				var producer ProducerContextFunc[int]
 				return CallContext[int](nil, producer)
 			},
-			want: "nil context",
+			want: "gopromise: nil context",
 		},
 	}
 
@@ -88,7 +88,7 @@ func TestResolveAndResolveContextGuards(t *testing.T) {
 				var p *promiseImpl[int]
 				return p.Resolve()
 			},
-			want: "empty promise",
+			want: "gopromise: empty promise",
 		},
 		{
 			name: "resolvecontext nil receiver",
@@ -96,7 +96,7 @@ func TestResolveAndResolveContextGuards(t *testing.T) {
 				var p *promiseImpl[int]
 				return p.ResolveContext(context.Background())
 			},
-			want: "empty promise",
+			want: "gopromise: empty promise",
 		},
 		{
 			name: "resolve uninitialized promise",
@@ -104,7 +104,7 @@ func TestResolveAndResolveContextGuards(t *testing.T) {
 				p := &promiseImpl[int]{}
 				return p.Resolve()
 			},
-			want: "uninitialized promise",
+			want: "gopromise: uninitialized promise",
 		},
 		{
 			name: "resolvecontext uninitialized promise",
@@ -112,7 +112,7 @@ func TestResolveAndResolveContextGuards(t *testing.T) {
 				p := &promiseImpl[int]{}
 				return p.ResolveContext(context.Background())
 			},
-			want: "uninitialized promise",
+			want: "gopromise: uninitialized promise",
 		},
 		{
 			name: "resolvecontext nil context",
@@ -122,7 +122,7 @@ func TestResolveAndResolveContextGuards(t *testing.T) {
 				})
 				return p.ResolveContext(nil)
 			},
-			want: "nil context",
+			want: "gopromise: nil context",
 		},
 	}
 
@@ -176,7 +176,7 @@ func TestProducerFailureModes(t *testing.T) {
 					panic("boom")
 				})
 			},
-			errChk: func(err error) bool { return err != nil && strings.Contains(err.Error(), "producer panic: boom") },
+			errChk: func(err error) bool { return err != nil && strings.Contains(err.Error(), "gopromise: producer panic: boom") },
 		},
 		{
 			name: "callcontext producer panic",
@@ -185,7 +185,7 @@ func TestProducerFailureModes(t *testing.T) {
 					panic("boom")
 				})
 			},
-			errChk: func(err error) bool { return err != nil && strings.Contains(err.Error(), "producer panic: boom") },
+			errChk: func(err error) bool { return err != nil && strings.Contains(err.Error(), "gopromise: producer panic: boom") },
 		},
 	}
 
