@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -400,6 +401,126 @@ func TestResolveAndResolveContextConcurrentMixedCallers(t *testing.T) {
 		if vals[i] != 99 {
 			t.Fatalf("caller %d expected 99, got %d", i, vals[i])
 		}
+	}
+}
+
+func TestCallOnceThenMixedResolveAndResolveContextCallers(t *testing.T) {
+	t.Parallel()
+
+	var producerCalls atomic.Int32
+	release := make(chan struct{})
+
+	p := Call(func() (int, error) {
+		producerCalls.Add(1)
+		<-release
+		return 321, nil
+	})
+
+	const callers = 80
+	vals := make([]int, callers)
+	errs := make([]error, callers)
+	shortTimeout := make([]bool, callers)
+
+	start := make(chan struct{})
+	var ready sync.WaitGroup
+	ready.Add(callers)
+
+	var wg sync.WaitGroup
+	var timeoutWG sync.WaitGroup
+	wg.Add(callers)
+	timeoutWG.Add(callers / 4)
+	for i := 0; i < callers; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			ready.Done()
+			<-start
+
+			if idx%4 == 0 {
+				shortTimeout[idx] = true
+				defer timeoutWG.Done()
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+				defer cancel()
+				vals[idx], errs[idx] = p.ResolveContext(ctx)
+				return
+			}
+
+			if idx%2 == 0 {
+				vals[idx], errs[idx] = p.Resolve()
+				return
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			vals[idx], errs[idx] = p.ResolveContext(ctx)
+		}(i)
+	}
+
+	ready.Wait()
+	close(start)
+
+	timeoutDone := make(chan struct{})
+	go func() {
+		defer close(timeoutDone)
+		timeoutWG.Wait()
+	}()
+
+	select {
+	case <-timeoutDone:
+	case <-time.After(time.Second):
+		t.Fatal("short-timeout callers did not finish")
+	}
+
+	close(release)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("mixed callers blocked")
+	}
+
+	timeoutCount := 0
+	successCount := 0
+	for i := 0; i < callers; i++ {
+		if shortTimeout[i] {
+			timeoutCount++
+			if !errors.Is(errs[i], context.DeadlineExceeded) {
+				t.Fatalf("caller %d expected deadline exceeded, got %v", i, errs[i])
+			}
+			if vals[i] != 0 {
+				t.Fatalf("caller %d expected 0 on timeout, got %d", i, vals[i])
+			}
+			continue
+		}
+
+		successCount++
+		if errs[i] != nil {
+			t.Fatalf("caller %d expected nil error, got %v", i, errs[i])
+		}
+		if vals[i] != 321 {
+			t.Fatalf("caller %d expected 321, got %d", i, vals[i])
+		}
+	}
+
+	if timeoutCount == 0 {
+		t.Fatal("expected at least one timeout caller")
+	}
+	if successCount == 0 {
+		t.Fatal("expected at least one success caller")
+	}
+
+	v, err := p.Resolve()
+	if err != nil || v != 321 {
+		t.Fatalf("final resolve expected (321, nil), got (%d, %v)", v, err)
+	}
+
+	if got := producerCalls.Load(); got != 1 {
+		t.Fatalf("producer called %d times, want 1", got)
 	}
 }
 
