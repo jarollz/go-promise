@@ -1,0 +1,45 @@
+# AI agent local state
+.claude/
+.opencode/
+.codex/
+.gemini/
+.cursor/
+.continue/
+.windsurf/
+.roo/
+.roo-code/
+.cline/
+.kilo/
+.augment/
+.ttadk/
+.coco/
+.aider*
+
+# Temporary outputs
+tmp/
+
+# Language/runtime caches
+__pycache__/
+
+# Go build/test artifacts
+*.test
+*.prof
+*.coverprofile
+coverage.out
+cpu.out
+mem.out
+trace.out
+__debug_bin
+
+# Go vendoring
+vendor/
+
+# Local tool caches
+.cache/
+.gocache/
+.gomodcache/
+
+# Editor/IDE metadata
+.vscode/
+.idea/
+*.iml
