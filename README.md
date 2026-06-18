@@ -23,6 +23,8 @@ It also supports context-aware producer execution and context-aware waiting.
 - Resolve with wait control using `p.ResolveContext(ctx)`.
 - Resolve many times; every call returns same cached value/error.
 - Resolve concurrently from multiple goroutines safely.
+- Safely mix `Resolve()` and `ResolveContext(ctx)` across goroutines on same promise.
+- `ResolveContext` caller timeouts do not affect other callers or final cached result.
 - Panic in producer is recovered and returned as error.
 - Nil producer returns deterministic error (`nil producer`).
 - Nil context returns deterministic error (`nil context`).
@@ -80,6 +82,9 @@ _ = err
 ```
 
 Both callers receive the same `(42, nil)` result.
+
+You can also safely mix callers that use `Resolve()` with callers that use `ResolveContext(ctx)` on the same promise.
+If some `ResolveContext` callers time out, other callers can still resolve successfully, and later `Resolve()` still returns the same cached producer result.
 
 ## Context-aware producer (`CallContext`)
 
