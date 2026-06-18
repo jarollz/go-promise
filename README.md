@@ -132,6 +132,57 @@ _ = err2
 
 `ResolveContext` controls only caller wait. Promise computation can still finish later.
 
+## Real-world example: feature flags (A/B testing)
+
+Enterprise microservices often depend on an A/B service that returns feature flags based on user info, device info, and experiment names.
+With `go-promise`, an endpoint can trigger that network call once in background, continue other work immediately, and only wait for flags at the exact decision points that need them.
+This snippet is also executable as doc example in `example_test.go` (`ExampleCallContext_featureFlagsABTest`).
+
+```go
+type ABFlags struct {
+	EnableNewCheckout bool
+	UseNewRanking     bool
+}
+
+func HandleFeed(ctx context.Context, userID string, device string) error {
+	abPromise := gopromise.CallContext(ctx, func(ctx context.Context) (ABFlags, error) {
+		return callABService(ctx, userID, device, []string{"checkout_exp", "ranking_exp"})
+	})
+
+	// Start other independent work immediately.
+	profilePromise := gopromise.CallContext(ctx, func(ctx context.Context) (Profile, error) {
+		return fetchProfile(ctx, userID)
+	})
+
+	inventoryPromise := gopromise.CallContext(ctx, func(ctx context.Context) (Inventory, error) {
+		return fetchInventory(ctx)
+	})
+
+	profile, err := profilePromise.Resolve()
+	if err != nil {
+		return err
+	}
+
+	inventory, err := inventoryPromise.Resolve()
+	if err != nil {
+		return err
+	}
+
+	// Resolve flags only where branch decision is needed.
+	flags, err := abPromise.ResolveContext(ctx)
+	if err != nil {
+		flags = ABFlags{} // fallback: safe defaults when AB service is slow/unavailable
+	}
+
+	if flags.UseNewRanking {
+		return serveNewRanking(profile, inventory)
+	}
+	return serveDefaultRanking(profile, inventory)
+}
+```
+
+This pattern avoids unnecessary blocking, ensures one shared AB fetch per request, and lets all branches/goroutines read the same cached flag result.
+
 ## Error behavior
 
 - `Call(nil)` resolves with `gopromise: nil producer`.

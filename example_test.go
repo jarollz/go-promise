@@ -81,3 +81,65 @@ func ExamplePromise_ResolveContext() {
 	// true
 	// 5 true
 }
+
+func ExampleCallContext_featureFlagsABTest() {
+	type ABFlags struct {
+		UseNewRanking bool
+	}
+
+	type Profile struct {
+		Name string
+	}
+
+	callABService := func(ctx context.Context, userID, device string, experiments []string) (ABFlags, error) {
+		_ = userID
+		_ = device
+		_ = experiments
+
+		select {
+		case <-time.After(20 * time.Millisecond):
+			return ABFlags{UseNewRanking: true}, nil
+		case <-ctx.Done():
+			return ABFlags{}, ctx.Err()
+		}
+	}
+
+	fetchProfile := func(ctx context.Context, userID string) (Profile, error) {
+		_ = userID
+
+		select {
+		case <-time.After(5 * time.Millisecond):
+			return Profile{Name: "alice"}, nil
+		case <-ctx.Done():
+			return Profile{}, ctx.Err()
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	abPromise := gopromise.CallContext(ctx, func(ctx context.Context) (ABFlags, error) {
+		return callABService(ctx, "u-42", "ios", []string{"ranking_exp"})
+	})
+
+	profilePromise := gopromise.CallContext(ctx, func(ctx context.Context) (Profile, error) {
+		return fetchProfile(ctx, "u-42")
+	})
+
+	profile, _ := profilePromise.Resolve()
+
+	// Resolve AB flags only when branch decision is needed.
+	rankingVersion := "default"
+	needRankingDecision := true
+	if needRankingDecision {
+		flags, err := abPromise.ResolveContext(ctx)
+		if err == nil && flags.UseNewRanking {
+			rankingVersion = "new"
+		}
+	}
+
+	fmt.Println(profile.Name, rankingVersion)
+
+	// Output:
+	// alice new
+}
